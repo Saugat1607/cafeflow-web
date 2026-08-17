@@ -8,301 +8,1023 @@ export default function MenuPage() {
     const [error, setError] = useState('');
     const [search, setSearch] = useState('');
     const [category, setCategory] = useState('all');
-    const [panel, setPanel] = useState(null); // 'add' | 'edit' | null
+
+    const [panel, setPanel] = useState(null);
     const [editingItem, setEditingItem] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
 
+    // ============================================================
+    // LOAD MENU
+    // ============================================================
+
     const load = () => {
+        setError('');
+
         menuApi
             .getMenuItems()
-            .then((res) => setItems(res.data.data))
-            .catch(() => setError('Could not load menu items.'));
+            .then((res) => {
+                setItems(res.data.data || []);
+            })
+            .catch(() => {
+                setError('Could not load menu items.');
+            });
     };
 
     useEffect(() => {
         load();
     }, []);
 
+    // ============================================================
+    // CATEGORIES
+    // ============================================================
+
     const categories = useMemo(() => {
         if (!items) return [];
-        return Array.from(new Set(items.map((i) => i.category).filter(Boolean))).sort();
+
+        return Array.from(
+            new Set(
+                items
+                    .map((item) => item.category)
+                    .filter(Boolean)
+                    .map((cat) => cat.trim())
+            )
+        ).sort();
     }, [items]);
 
-    const filtered = useMemo(() => {
+    // ============================================================
+    // FILTER ITEMS
+    // ============================================================
+
+    const filteredItems = useMemo(() => {
         if (!items) return [];
-        const q = search.trim().toLowerCase();
+
+        const query = search.trim().toLowerCase();
+
         return items.filter((item) => {
-            const matchesSearch = !q || item.name.toLowerCase().includes(q);
-            const matchesCategory = category === 'all' || item.category === category;
+            const name = item.name?.toLowerCase() || '';
+            const description = item.description?.toLowerCase() || '';
+            const itemCategory = item.category?.toLowerCase() || '';
+
+            const matchesSearch =
+                !query ||
+                name.includes(query) ||
+                description.includes(query) ||
+                itemCategory.includes(query);
+
+            const matchesCategory =
+                category === 'all' ||
+                item.category === category;
+
             return matchesSearch && matchesCategory;
         });
     }, [items, search, category]);
+
+    // ============================================================
+    // GROUP BY CATEGORY
+    // ============================================================
+
+    const groupedItems = useMemo(() => {
+        const groups = {};
+
+        filteredItems.forEach((item) => {
+            const categoryName = item.category || 'Uncategorized';
+
+            if (!groups[categoryName]) {
+                groups[categoryName] = [];
+            }
+
+            groups[categoryName].push(item);
+        });
+
+        return groups;
+    }, [filteredItems]);
+
+    // ============================================================
+    // ADD
+    // ============================================================
 
     const openAddPanel = () => {
         setEditingItem(null);
         setPanel('add');
     };
 
+    // ============================================================
+    // EDIT
+    // ============================================================
+
     const openEditPanel = (item) => {
         setEditingItem(item);
         setPanel('edit');
     };
+
+    // ============================================================
+    // CLOSE PANEL
+    // ============================================================
 
     const closePanel = () => {
         setPanel(null);
         setEditingItem(null);
     };
 
+    // ============================================================
+    // DELETE
+    // ============================================================
+
     const handleDelete = () => {
         if (!deleteTarget) return;
+
         menuApi
             .deleteMenuItem(deleteTarget.id)
             .then(() => {
                 setDeleteTarget(null);
                 load();
             })
-            .catch(() => setError('Could not delete item. Please try again.'));
+            .catch(() => {
+                setError('Could not delete item. Please try again.');
+            });
     };
 
+    // ============================================================
+    // LOADING
+    // ============================================================
+
+    if (!items) {
+        return <MenuLoading />;
+    }
+
     return (
-        <div className="min-h-screen bg-stone-50/50 p-6 lg:p-8">
-            <div className="max-w-7xl mx-auto space-y-8">
-                
-                {/* Header Section */}
-                <div className="bg-gradient-to-r from-amber-900 via-amber-800 to-orange-700 rounded-3xl p-8 shadow-xl text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                    <div>
-                        <Link
-                            to="/"
-                            className="inline-flex items-center gap-2 text-xs font-semibold tracking-wider uppercase text-amber-200 hover:text-white transition-colors mb-3"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                            </svg>
-                            Back to Dashboard
-                        </Link>
-                        <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight">
-                            Menu Management
-                        </h1>
-                        <p className="mt-2 text-amber-100 text-sm lg:text-base">
-                            {items ? `${items.length} item${items.length === 1 ? '' : 's'} available on your menu` : 'Loading menu catalog...'}
-                        </p>
-                    </div>
-                    <button
-                        onClick={openAddPanel}
-                        className="inline-flex items-center gap-2 rounded-xl bg-white text-amber-900 text-sm font-bold px-5 py-3 hover:bg-amber-50 transition-all shadow-md shrink-0"
-                    >
-                        <PlusIcon /> Add New Item
-                    </button>
-                </div>
+        <div className="min-h-screen bg-[#F8F6F1] px-4 py-6 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-7xl space-y-6">
 
-                {/* Filters & Search Bar */}
-                <div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-100 flex flex-col sm:flex-row gap-4 items-center justify-between">
-                    <div className="relative w-full sm:w-96">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35m0 0a7.5 7.5 0 10-10.6 0 7.5 7.5 0 0010.6 0z" />
-                        </svg>
-                        <input
-                            type="text"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Search menu items by name..."
-                            className="w-full rounded-xl border border-stone-200 bg-stone-50/50 pl-10 pr-4 py-2.5 text-sm text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:bg-white transition"
-                        />
-                    </div>
-                    
-                    <select
-                        value={category}
-                        onChange={(e) => setCategory(e.target.value)}
-                        className="w-full sm:w-56 rounded-xl border border-stone-200 bg-stone-50/50 px-4 py-2.5 text-sm text-stone-700 focus:outline-none focus:ring-2 focus:ring-amber-600 focus:bg-white transition"
-                    >
-                        <option value="all">All Categories</option>
-                        {categories.map((c) => (
-                            <option key={c} value={c}>{c}</option>
-                        ))}
-                    </select>
-                </div>
+                {/* ==================================================
+                    HEADER
+                ================================================== */}
 
-                {/* Error Banner */}
-                {error && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-xl shadow-sm text-sm">
-                        {error}
-                    </div>
-                )}
+                <header className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
 
-                {/* Content Grid / Skeletons */}
-                {!items ? (
-                    <MenuSkeleton />
-                ) : filtered.length === 0 ? (
-                    <div className="bg-white rounded-3xl border border-dashed border-stone-300 p-16 text-center space-y-3">
-                        <div className="w-12 h-12 bg-amber-50 text-amber-700 rounded-2xl flex items-center justify-center mx-auto text-xl">
-                            🍔
+                    <div className="flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between">
+
+                        <div>
+
+                            <Link
+                                to="/"
+                                className="mb-5 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-stone-500 transition hover:text-amber-700"
+                            >
+                                <ArrowLeftIcon />
+                                Back to Dashboard
+                            </Link>
+
+                            <div className="flex items-center gap-4">
+
+                                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
+                                    <RestaurantIcon />
+                                </div>
+
+                                <div>
+                                    <h1 className="text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
+                                        Menu Management
+                                    </h1>
+
+                                    <p className="mt-1 text-sm text-stone-500">
+                                        Organize and manage your restaurant menu.
+                                    </p>
+                                </div>
+
+                            </div>
                         </div>
-                        <h3 className="text-lg font-bold text-stone-800">No items found</h3>
-                        <p className="text-sm text-stone-500 max-w-sm mx-auto">
-                            {items.length === 0
-                                ? 'Your menu is empty right now. Add your first dish or beverage to get started.'
-                                : 'No items match your active search or category filter.'}
-                        </p>
+
+                        <button
+                            onClick={openAddPanel}
+                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-700 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-amber-800 active:scale-[0.98]"
+                        >
+                            <PlusIcon />
+                            Add New Item
+                        </button>
+
                     </div>
-                ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                        {filtered.map((item) => (
-                            <MenuItemCard
-                                key={item.id}
-                                item={item}
-                                onEdit={() => openEditPanel(item)}
-                                onDelete={() => setDeleteTarget(item)}
-                            />
-                        ))}
+
+                    {/* ==================================================
+                        STATS
+                    ================================================== */}
+
+                    <div className="grid grid-cols-3 border-t border-stone-200 bg-[#FAF9F6]">
+
+                        <Stat
+                            value={items.length}
+                            label="Total Items"
+                        />
+
+                        <Stat
+                            value={categories.length}
+                            label="Categories"
+                        />
+
+                        <Stat
+                            value={filteredItems.length}
+                            label="Showing"
+                        />
+
+                    </div>
+
+                </header>
+
+                {/* ==================================================
+                    ERROR
+                ================================================== */}
+
+                {error && (
+                    <div className="flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+
+                        <AlertIcon />
+
+                        <span>{error}</span>
+
+                        <button
+                            onClick={() => setError('')}
+                            className="ml-auto rounded-lg p-1 text-red-500 transition hover:bg-red-100 hover:text-red-700"
+                        >
+                            <CloseIcon />
+                        </button>
+
                     </div>
                 )}
+
+                {/* ==================================================
+                    SEARCH
+                ================================================== */}
+
+                <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+
+                        <div className="relative flex-1">
+
+                            <SearchIcon className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-stone-400" />
+
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Search menu items..."
+                                className="w-full rounded-xl border border-stone-200 bg-[#FAF9F6] py-3 pl-11 pr-10 text-sm text-stone-800 outline-none transition placeholder:text-stone-400 focus:border-amber-600 focus:bg-white focus:ring-2 focus:ring-amber-100"
+                            />
+
+                            {search && (
+                                <button
+                                    onClick={() => setSearch('')}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-stone-400 transition hover:bg-stone-100 hover:text-stone-700"
+                                >
+                                    <CloseIcon />
+                                </button>
+                            )}
+
+                        </div>
+
+                        <div className="text-sm text-stone-500">
+
+                            <span className="font-semibold text-stone-800">
+                                {filteredItems.length}
+                            </span>
+
+                            {' '}
+                            {filteredItems.length === 1
+                                ? 'item'
+                                : 'items'} found
+
+                        </div>
+
+                    </div>
+
+                </section>
+
+                {/* ==================================================
+                    CATEGORY TABS
+                ================================================== */}
+
+                <section className="rounded-2xl border border-stone-200 bg-white p-3 shadow-sm">
+
+                    <div className="flex gap-2 overflow-x-auto">
+
+                        <CategoryTab
+                            label="All Items"
+                            count={items.length}
+                            active={category === 'all'}
+                            onClick={() => setCategory('all')}
+                            icon={<GridIcon />}
+                        />
+
+                        {categories.map((cat) => {
+
+                            const count = items.filter(
+                                (item) => item.category === cat
+                            ).length;
+
+                            return (
+                                <CategoryTab
+                                    key={cat}
+                                    label={cat}
+                                    count={count}
+                                    active={category === cat}
+                                    onClick={() => setCategory(cat)}
+                                />
+                            );
+                        })}
+
+                    </div>
+
+                </section>
+
+                {/* ==================================================
+                    MENU CONTENT
+                ================================================== */}
+
+                {filteredItems.length === 0 ? (
+
+                    <EmptyState
+                        hasItems={items.length > 0}
+                        search={search}
+                        onAdd={openAddPanel}
+                    />
+
+                ) : category === 'all' ? (
+
+                    <div className="space-y-10">
+
+                        {Object.entries(groupedItems).map(
+                            ([groupCategory, groupItems]) => (
+
+                                <CategorySection
+                                    key={groupCategory}
+                                    category={groupCategory}
+                                    items={groupItems}
+                                    onEdit={openEditPanel}
+                                    onDelete={setDeleteTarget}
+                                />
+
+                            )
+                        )}
+
+                    </div>
+
+                ) : (
+
+                    <CategorySection
+                        category={category}
+                        items={filteredItems}
+                        onEdit={openEditPanel}
+                        onDelete={setDeleteTarget}
+                    />
+
+                )}
+
             </div>
 
-            {/* Add / Edit Slide-Over Drawer */}
+            {/* ======================================================
+                ADD / EDIT DRAWER
+            ======================================================= */}
+
             {panel && (
                 <div className="fixed inset-0 z-50 flex justify-end">
-                    <div className="absolute inset-0 bg-stone-900/50 backdrop-blur-xs transition-opacity" onClick={closePanel} />
-                    <div className="relative w-full sm:w-[460px] h-full bg-white shadow-2xl flex flex-col z-10 animate-in slide-in-from-right duration-300">
-                        <div className="flex items-center justify-between px-6 py-5 border-b border-stone-100">
-                            <h2 className="text-lg font-bold text-stone-800">
-                                {panel === 'edit' ? 'Edit Menu Item' : 'Add New Menu Item'}
-                            </h2>
+
+                    <div
+                        className="absolute inset-0 bg-stone-950/50 backdrop-blur-sm"
+                        onClick={closePanel}
+                    />
+
+                    <div className="relative z-10 flex h-full w-full max-w-lg flex-col bg-white shadow-2xl">
+
+                        <div className="flex items-center justify-between border-b border-stone-200 px-6 py-5">
+
+                            <div>
+
+                                <h2 className="text-lg font-bold text-stone-900">
+                                    {panel === 'edit'
+                                        ? 'Edit Menu Item'
+                                        : 'Add New Menu Item'}
+                                </h2>
+
+                                <p className="mt-1 text-xs text-stone-500">
+                                    {panel === 'edit'
+                                        ? 'Update this menu item.'
+                                        : 'Add a new item to your menu.'}
+                                </p>
+
+                            </div>
+
                             <button
                                 onClick={closePanel}
-                                className="w-8 h-8 rounded-xl flex items-center justify-center text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition"
-                                aria-label="Close"
+                                className="flex h-9 w-9 items-center justify-center rounded-xl text-stone-400 transition hover:bg-stone-100 hover:text-stone-700"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                                <CloseIcon />
                             </button>
+
                         </div>
-                        <div className="flex-1 overflow-y-auto px-6 py-6">
+
+                        <div className="flex-1 overflow-y-auto p-6">
+
                             <MenuItemForm
                                 initialValues={editingItem ?? {}}
-                                submitLabel={panel === 'edit' ? 'Save Changes' : 'Create Item'}
+                                submitLabel={
+                                    panel === 'edit'
+                                        ? 'Save Changes'
+                                        : 'Create Item'
+                                }
                                 onSubmit={(payload) => {
+
                                     const request = editingItem
-                                        ? menuApi.updateMenuItem(editingItem.id, payload)
+                                        ? menuApi.updateMenuItem(
+                                            editingItem.id,
+                                            payload
+                                        )
                                         : menuApi.createMenuItem(payload);
+
                                     return request.then(() => {
                                         closePanel();
                                         load();
                                     });
+
                                 }}
                             />
+
                         </div>
+
                     </div>
+
                 </div>
             )}
 
-            {/* Delete Confirmation Modal */}
+            {/* ======================================================
+                DELETE MODAL
+            ======================================================= */}
+
             {deleteTarget && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-stone-900/50 backdrop-blur-xs" onClick={() => setDeleteTarget(null)} />
-                    <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 text-center space-y-4 z-10">
-                        <div className="w-12 h-12 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto text-xl">
-                            ⚠️
-                        </div>
-                        <div>
-                            <h3 className="text-base font-bold text-stone-800">Delete "{deleteTarget.name}"?</h3>
-                            <p className="text-sm text-stone-500 mt-1">This action cannot be undone and will remove it from the live menu.</p>
-                        </div>
-                        <div className="flex gap-3 pt-2">
-                            <button
-                                onClick={() => setDeleteTarget(null)}
-                                className="flex-1 rounded-xl border border-stone-200 text-stone-700 text-sm font-semibold py-2.5 hover:bg-stone-50 transition"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleDelete}
-                                className="flex-1 rounded-xl bg-red-600 text-white text-sm font-semibold py-2.5 hover:bg-red-700 transition shadow-sm"
-                            >
-                                Confirm Delete
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <DeleteModal
+                    item={deleteTarget}
+                    onCancel={() => setDeleteTarget(null)}
+                    onConfirm={handleDelete}
+                />
             )}
+
         </div>
     );
 }
 
-function MenuItemCard({ item, onEdit, onDelete }) {
+/* =====================================================================
+   CATEGORY SECTION
+===================================================================== */
+
+function CategorySection({
+    category,
+    items,
+    onEdit,
+    onDelete,
+}) {
     return (
-        <div className="bg-white rounded-2xl shadow-xs hover:shadow-lg border border-stone-100 p-6 transition-all duration-300 flex flex-col justify-between group">
-            <div>
-                <div className="flex items-start justify-between gap-3 mb-2">
-                    <h3 className="font-bold text-stone-800 text-base group-hover:text-amber-700 transition">
-                        {item.name}
-                    </h3>
-                    <span className="text-base font-extrabold text-emerald-600 shrink-0">
-                        Rs{Number(item.price).toFixed(2)}
-                    </span>
+        <section>
+
+            {/* Category Header */}
+
+            <div className="mb-5 flex items-center gap-4">
+
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
+                    <CategoryIcon />
                 </div>
 
-                {item.category && (
-                    <span className="inline-block text-xs font-semibold px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200/50 mb-3">
-                        {item.category}
-                    </span>
-                )}
+                <div className="shrink-0">
 
-                {item.description && (
-                    <p className="text-sm text-stone-500 line-clamp-2 mb-6">
-                        {item.description}
+                    <div className="flex items-center gap-3">
+
+                        <h2 className="text-xl font-bold text-stone-900">
+                            {category}
+                        </h2>
+
+                        <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold text-stone-600">
+                            {items.length}
+                        </span>
+
+                    </div>
+
+                    <p className="mt-0.5 text-xs text-stone-500">
+                        {items.length === 1
+                            ? '1 menu item'
+                            : `${items.length} menu items`}
                     </p>
-                )}
+
+                </div>
+
+                <div className="h-px flex-1 bg-stone-200" />
+
             </div>
 
-            <div className="flex gap-2 pt-4 border-t border-stone-100">
+            {/* Cards */}
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+
+                {items.map((item) => (
+
+                    <MenuItemCard
+                        key={item.id}
+                        item={item}
+                        onEdit={() => onEdit(item)}
+                        onDelete={() => onDelete(item)}
+                    />
+
+                ))}
+
+            </div>
+
+        </section>
+    );
+}
+
+/* =====================================================================
+   MENU ITEM CARD
+===================================================================== */
+
+function MenuItemCard({
+    item,
+    onEdit,
+    onDelete,
+}) {
+    return (
+        <article className="group flex flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-amber-200 hover:shadow-md">
+
+            <div className="p-5">
+
+                <div className="mb-4 flex items-start justify-between gap-4">
+
+                    <div className="min-w-0">
+
+                        <h3 className="truncate text-base font-bold text-stone-900">
+                            {item.name}
+                        </h3>
+
+                        {item.category && (
+                            <span className="mt-2 inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                                {item.category}
+                            </span>
+                        )}
+
+                    </div>
+
+                    {/* Price */}
+
+                    <div className="shrink-0 text-right">
+
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">
+                            Price
+                        </p>
+
+                        <p className="mt-0.5 text-lg font-bold text-emerald-700">
+                            Rs. {Number(item.price).toFixed(2)}
+                        </p>
+
+                    </div>
+
+                </div>
+
+                {/* Description */}
+
+                <div className="min-h-[48px]">
+
+                    {item.description ? (
+
+                        <p className="line-clamp-2 text-sm leading-6 text-stone-500">
+                            {item.description}
+                        </p>
+
+                    ) : (
+
+                        <p className="text-sm italic text-stone-400">
+                            No description available
+                        </p>
+
+                    )}
+
+                </div>
+
+            </div>
+
+            {/* Actions */}
+
+            <div className="mt-auto flex border-t border-stone-100 bg-[#FAF9F6]">
+
                 <button
                     onClick={onEdit}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50/50 text-stone-700 text-xs font-semibold py-2.5 hover:bg-white hover:border-stone-300 transition shadow-xs"
+                    className="flex flex-1 items-center justify-center gap-2 px-4 py-3 text-xs font-semibold text-stone-600 transition hover:bg-white hover:text-amber-700"
                 >
-                    <EditIcon /> Edit
+                    <EditIcon />
+                    Edit
                 </button>
+
+                <div className="w-px bg-stone-200" />
+
                 <button
                     onClick={onDelete}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-red-100 bg-red-50/30 text-red-600 text-xs font-semibold py-2.5 hover:bg-red-50 transition shadow-xs"
+                    className="flex flex-1 items-center justify-center gap-2 px-4 py-3 text-xs font-semibold text-stone-600 transition hover:bg-red-50 hover:text-red-600"
                 >
-                    <TrashIcon /> Delete
+                    <TrashIcon />
+                    Delete
                 </button>
+
             </div>
+
+        </article>
+    );
+}
+
+/* =====================================================================
+   CATEGORY TAB
+===================================================================== */
+
+function CategoryTab({
+    label,
+    count,
+    active,
+    onClick,
+    icon,
+}) {
+    return (
+        <button
+            onClick={onClick}
+            className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                active
+                    ? 'bg-amber-700 text-white shadow-sm'
+                    : 'bg-white text-stone-600 hover:bg-amber-50 hover:text-amber-800'
+            }`}
+        >
+
+            {icon}
+
+            <span>{label}</span>
+
+            <span
+                className={`rounded-full px-2 py-0.5 text-[10px] ${
+                    active
+                        ? 'bg-white/20 text-white'
+                        : 'bg-stone-100 text-stone-500'
+                }`}
+            >
+                {count}
+            </span>
+
+        </button>
+    );
+}
+
+/* =====================================================================
+   STAT
+===================================================================== */
+
+function Stat({
+    value,
+    label,
+}) {
+    return (
+        <div className="px-5 py-4 sm:px-7">
+
+            <p className="text-xl font-bold text-stone-900">
+                {value}
+            </p>
+
+            <p className="mt-0.5 text-[11px] font-medium text-stone-500">
+                {label}
+            </p>
+
         </div>
     );
 }
 
-function MenuSkeleton() {
+/* =====================================================================
+   EMPTY STATE
+===================================================================== */
+
+function EmptyState({
+    hasItems,
+    search,
+    onAdd,
+}) {
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 animate-pulse">
-            {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-48 rounded-2xl bg-stone-200/70"></div>
-            ))}
+        <div className="rounded-3xl border border-dashed border-stone-300 bg-white px-6 py-16 text-center shadow-sm">
+
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
+
+                {search
+                    ? <SearchIcon />
+                    : <RestaurantIcon />
+                }
+
+            </div>
+
+            <h3 className="mt-5 text-lg font-bold text-stone-900">
+
+                {hasItems
+                    ? 'No menu items found'
+                    : 'Your menu is empty'}
+
+            </h3>
+
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-500">
+
+                {hasItems
+                    ? 'Try changing your search or selecting another category.'
+                    : 'Start building your menu by adding your first item.'}
+
+            </p>
+
+            {!hasItems && (
+                <button
+                    onClick={onAdd}
+                    className="mt-6 inline-flex items-center gap-2 rounded-xl bg-amber-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-amber-800"
+                >
+                    <PlusIcon />
+                    Add First Item
+                </button>
+            )}
+
         </div>
+    );
+}
+
+/* =====================================================================
+   DELETE MODAL
+===================================================================== */
+
+function DeleteModal({
+    item,
+    onCancel,
+    onConfirm,
+}) {
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+
+            <div
+                className="absolute inset-0 bg-stone-950/50 backdrop-blur-sm"
+                onClick={onCancel}
+            />
+
+            <div className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+                    <TrashIcon />
+                </div>
+
+                <h3 className="mt-5 text-lg font-bold text-stone-900">
+                    Delete menu item?
+                </h3>
+
+                <p className="mt-2 text-sm leading-6 text-stone-500">
+
+                    Are you sure you want to delete{' '}
+
+                    <span className="font-semibold text-stone-800">
+                        "{item.name}"
+                    </span>
+
+                    ?
+
+                    This action cannot be undone.
+
+                </p>
+
+                <div className="mt-6 flex gap-3">
+
+                    <button
+                        onClick={onCancel}
+                        className="flex-1 rounded-xl border border-stone-200 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+                    >
+                        Cancel
+                    </button>
+
+                    <button
+                        onClick={onConfirm}
+                        className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
+                    >
+                        Delete Item
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+    );
+}
+
+/* =====================================================================
+   LOADING
+===================================================================== */
+
+function MenuLoading() {
+    return (
+        <div className="min-h-screen bg-[#F8F6F1] px-4 py-6 sm:px-6 lg:px-8">
+
+            <div className="mx-auto max-w-7xl space-y-6">
+
+                <div className="h-48 animate-pulse rounded-3xl bg-stone-200" />
+
+                <div className="h-20 animate-pulse rounded-2xl bg-white" />
+
+                <div className="h-14 animate-pulse rounded-2xl bg-white" />
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+
+                    {Array.from({ length: 6 }).map((_, index) => (
+
+                        <div
+                            key={index}
+                            className="h-48 animate-pulse rounded-2xl bg-white"
+                        />
+
+                    ))}
+
+                </div>
+
+            </div>
+
+        </div>
+    );
+}
+
+/* =====================================================================
+   ICONS
+===================================================================== */
+
+function RestaurantIcon() {
+    return (
+        <svg
+            className="h-7 w-7"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M4 3v8" />
+            <path d="M8 3v8" />
+            <path d="M6 3v18" />
+            <path d="M4 11h4" />
+            <path d="M14 3v18" />
+            <path d="M14 3c4 1 6 4 6 7v2h-6" />
+        </svg>
+    );
+}
+
+function CategoryIcon() {
+    return (
+        <svg
+            className="h-5 w-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+            <rect x="14" y="14" width="7" height="7" rx="1" />
+        </svg>
+    );
+}
+
+function GridIcon() {
+    return (
+        <svg
+            className="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+            <rect x="14" y="14" width="7" height="7" rx="1" />
+        </svg>
+    );
+}
+
+function SearchIcon({ className = 'h-5 w-5' }) {
+    return (
+        <svg
+            className={className}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-4-4" />
+        </svg>
     );
 }
 
 function PlusIcon() {
     return (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        <svg
+            className="h-5 w-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+        >
+            <path d="M12 5v14" />
+            <path d="M5 12h14" />
         </svg>
     );
 }
 
 function EditIcon() {
     return (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+        <svg
+            className="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
         </svg>
     );
 }
 
 function TrashIcon() {
     return (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+        <svg
+            className="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M3 6h18" />
+            <path d="M8 6V4h8v2" />
+            <path d="M19 6l-1 14H6L5 6" />
+            <path d="M10 11v5" />
+            <path d="M14 11v5" />
+        </svg>
+    );
+}
+
+function ArrowLeftIcon() {
+    return (
+        <svg
+            className="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="m15 18-6-6 6-6" />
+        </svg>
+    );
+}
+
+function CloseIcon() {
+    return (
+        <svg
+            className="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+        >
+            <path d="M6 6l12 12" />
+            <path d="M18 6 6 18" />
+        </svg>
+    );
+}
+
+function AlertIcon() {
+    return (
+        <svg
+            className="h-5 w-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M12 9v4" />
+            <path d="M12 17h.01" />
+            <path d="M10.3 3.8 2.7 17a2 2 0 0 0 1.7 3h15.2a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0Z" />
         </svg>
     );
 }
