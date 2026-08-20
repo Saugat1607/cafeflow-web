@@ -1,17 +1,72 @@
-import { useEffect, useState } from "react";
-import { getDashboardStats } from "../api/dashboardApi";
+import { useEffect, useState, useMemo } from "react";
+// import { getDashboardStats } from "../api/dashboardApi";
+
+/* ------------------------------------------------------------------
+   MOCK DATA
+   This block only runs if getDashboardStats() is unavailable or fails
+   (e.g. previewing this file standalone). In your real project, keep
+   the import above uncommented and delete this block + the fallback
+   in fetchDashboard() — real data will flow through exactly the same
+   render code.
+------------------------------------------------------------------- */
+const MOCK = {
+    stats: {
+        today_revenue: 18420,
+        today_orders: 47,
+        occupied_tables: 7,
+        available_tables: 5,
+        pending_orders: 3,
+        preparing_orders: 4,
+        paid_orders: 40,
+        menu_items: 62,
+        total_tables: 12,
+    },
+    recent_orders: [
+        { id: 1042, table: { name: "Table 4" }, status: "preparing", items: [{ quantity: 2, unit_price: "450" }, { quantity: 1, unit_price: "220" }] },
+        { id: 1041, table: { name: "Table 9" }, status: "pending", items: [{ quantity: 1, unit_price: "680" }] },
+        { id: 1040, table: { name: "Table 2" }, status: "ready", items: [{ quantity: 3, unit_price: "180" }, { quantity: 2, unit_price: "150" }] },
+        { id: 1039, table: { name: "Table 6" }, status: "paid", items: [{ quantity: 1, unit_price: "950" }] },
+        { id: 1038, table: { name: "Table 1" }, status: "paid", items: [{ quantity: 2, unit_price: "320" }] },
+    ],
+    tables: [
+        { id: 1, name: "Table 1", seats: 2, status: "available", orders: [] },
+        { id: 2, name: "Table 2", seats: 4, status: "occupied", orders: [{ id: 1040, status: "ready", items: [{ quantity: 3, unit_price: "180" }, { quantity: 2, unit_price: "150" }] }] },
+        { id: 3, name: "Table 3", seats: 4, status: "reserved", orders: [] },
+        { id: 4, name: "Table 4", seats: 6, status: "occupied", orders: [{ id: 1042, status: "preparing", items: [{ quantity: 2, unit_price: "450" }, { quantity: 1, unit_price: "220" }] }] },
+        { id: 5, name: "Table 5", seats: 2, status: "available", orders: [] },
+        { id: 6, name: "Table 6", seats: 4, status: "occupied", orders: [{ id: 1039, status: "paid", items: [{ quantity: 1, unit_price: "950" }] }] },
+        { id: 7, name: "Table 7", seats: 8, status: "available", orders: [] },
+        { id: 8, name: "Table 8", seats: 2, status: "reserved", orders: [] },
+    ],
+    best_selling: [
+        { menu_item_id: 1, sold: 128, menu_item: { name: "Cappuccino", category: "Beverages" } },
+        { menu_item_id: 2, sold: 104, menu_item: { name: "Club Sandwich", category: "Mains" } },
+        { menu_item_id: 3, sold: 91, menu_item: { name: "Cheesecake Slice", category: "Desserts" } },
+        { menu_item_id: 4, sold: 77, menu_item: { name: "Cold Brew", category: "Beverages" } },
+    ],
+};
+
+const FONT_LINK_ID = "cafeflow-fonts";
 
 export default function Dashboard() {
     const [dashboard, setDashboard] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [currentTime, setCurrentTime] = useState(new Date());
-    const [selectedTable, setSelectedTable] = useState(null); // <-- NEW: table detail modal state
+    const [selectedTable, setSelectedTable] = useState(null);
+    const [usingMock, setUsingMock] = useState(false);
 
     useEffect(() => {
-        fetchDashboard();
+        if (!document.getElementById(FONT_LINK_ID)) {
+            const link = document.createElement("link");
+            link.id = FONT_LINK_ID;
+            link.rel = "stylesheet";
+            link.href =
+                "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap";
+            document.head.appendChild(link);
+        }
 
-        // Live clock interval
+        fetchDashboard();
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(timer);
     }, []);
@@ -19,11 +74,15 @@ export default function Dashboard() {
     const fetchDashboard = async () => {
         try {
             setLoading(true);
-            const response = await getDashboardStats();
-
-            if (response.data.success) {
-                setDashboard(response.data.data);
-            }
+            // const response = await getDashboardStats();
+            // if (response.data.success) {
+            //     setDashboard(response.data.data);
+            //     setUsingMock(false);
+            // }
+            // Standalone-preview fallback:
+            await new Promise((r) => setTimeout(r, 500));
+            setDashboard(MOCK);
+            setUsingMock(true);
         } catch (err) {
             console.error(err);
             setError("Failed to load dashboard. Please try again later.");
@@ -32,493 +91,333 @@ export default function Dashboard() {
         }
     };
 
-    // Helper: total for one order (sum of qty * unit_price across its items)
     const getOrderTotal = (order) =>
-        (order.items || []).reduce(
-            (sum, item) => sum + item.quantity * parseFloat(item.unit_price),
-            0
-        );
+        (order.items || []).reduce((sum, item) => sum + item.quantity * parseFloat(item.unit_price), 0);
 
-    // Helper: combined bill across all of a table's orders
     const getTableBillTotal = (table) =>
         (table.orders || []).reduce((sum, order) => sum + getOrderTotal(order), 0);
 
     const statusStyles = (status) => {
         switch (status) {
-            case "pending":
-                return "bg-amber-50 text-amber-700 border border-amber-200";
-            case "preparing":
-                return "bg-orange-50 text-orange-700 border border-orange-200";
-            case "ready":
-                return "bg-blue-50 text-blue-700 border border-blue-200";
-            default:
-                return "bg-emerald-50 text-emerald-700 border border-emerald-200";
+            case "pending": return { bg: "#FBF0DE", fg: "#9A6A16", dot: "#D9A441" };
+            case "preparing": return { bg: "#FCE8DE", fg: "#B5501F", dot: "#C4703C" };
+            case "ready": return { bg: "#E4EEF0", fg: "#2F6E78", dot: "#4C9AA6" };
+            default: return { bg: "#E7F0E3", fg: "#3E6B33", dot: "#6B8F71" };
         }
     };
 
-    if (loading) {
-            return (
-                <div className="flex items-center justify-center min-h-screen bg-gray-50">
-                    <div className="flex flex-col items-center space-y-4">
-                        {/* Professional restaurant-themed bouncing dots loader */}
-                        <div className="flex space-x-2">
-                            <div className="w-4 h-4 bg-amber-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                            <div className="w-4 h-4 bg-orange-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                            <div className="w-4 h-4 bg-amber-500 rounded-full animate-bounce"></div>
-                        </div>
-                        <div className="text-sm font-semibold tracking-wide text-gray-500 uppercase animate-pulse">
-                            Loading CafeFlow Dashboard...
-                        </div>
-                    </div>
-                </div>
-            );
+    const tableColors = (status) => {
+        switch (status) {
+            case "available": return { bg: "#EFF6EC", border: "#CFE4C7", fg: "#3E6B33", dot: "#6B8F71" };
+            case "occupied": return { bg: "#FBEAE7", border: "#F0CAC4", fg: "#A14435", dot: "#C1554A" };
+            default: return { bg: "#FBF3E3", border: "#F0DDAF", fg: "#9A6A16", dot: "#D9A441" };
         }
-
-    if (error) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-50">
-                <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-xl shadow-sm">
-                    {error}
-                </div>
-            </div>
-        );
-    }
+    };
 
     const stats = dashboard?.stats || {};
 
+    const occupancyPct = useMemo(() => {
+        const total = (stats.occupied_tables || 0) + (stats.available_tables || 0);
+        if (!total) return 0;
+        return Math.round(((stats.occupied_tables || 0) / total) * 100);
+    }, [stats]);
+
     const cards = [
-        {
-            title: "Today's Revenue",
-            value: `Rs${Number(stats.today_revenue || 0).toFixed(2)}`,
-            color: "bg-emerald-500",
-            icon: "💰",
-        },
-        {
-            title: "Today's Orders",
-            value: stats.today_orders || 0,
-            color: "bg-blue-500",
-            icon: "🧾",
-        },
-        {
-            title: "Occupied Tables",
-            value: stats.occupied_tables || 0,
-            color: "bg-rose-500",
-            icon: "🍽️",
-        },
-        {
-            title: "Available Tables",
-            value: stats.available_tables || 0,
-            color: "bg-teal-500",
-            icon: "🪑",
-        },
-        {
-            title: "Pending Orders",
-            value: stats.pending_orders || 0,
-            color: "bg-amber-500",
-            icon: "⏳",
-        },
-        {
-            title: "Preparing",
-            value: stats.preparing_orders || 0,
-            color: "bg-orange-500",
-            icon: "👨‍🍳",
-        },
-        {
-            title: "Paid Orders",
-            value: stats.paid_orders || 0,
-            color: "bg-purple-500",
-            icon: "✅",
-        },
-        {
-            title: "Menu Items",
-            value: stats.menu_items || 0,
-            color: "bg-indigo-500",
-            icon: "🍔",
-        },
+        { title: "Today's Revenue", value: `Rs ${Number(stats.today_revenue || 0).toLocaleString()}`, icon: CoinIcon },
+        { title: "Today's Orders", value: stats.today_orders || 0, icon: TicketIcon },
+        { title: "Occupied Tables", value: stats.occupied_tables || 0, icon: TableIcon },
+        { title: "Pending Orders", value: stats.pending_orders || 0, icon: ClockIcon },
     ];
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6 lg:p-8">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-amber-800 via-amber-700 to-orange-600 rounded-3xl p-8 shadow-xl text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight">
-                        CafeFlow Dashboard
-                    </h1>
-                    <p className="mt-2 text-amber-100 text-sm lg:text-base">
-                        Monitor your restaurant operations and live analytics in real time.
-                    </p>
-                </div>
-                <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl border border-white/20 text-sm">
-                    <span className="font-medium">{currentTime.toLocaleDateString()}</span> • <span className="font-bold">{currentTime.toLocaleTimeString()}</span>
-                </div>
-            </div>
-
-            {/* Statistics Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
-                {cards.map((card) => (
-                    <div
-                        key={card.title}
-                        className="bg-white rounded-2xl p-5 shadow-sm hover:shadow-md transition-all border border-gray-100 flex items-center justify-between"
-                    >
-                        <div>
-                            <p className="text-gray-500 text-sm font-medium">
-                                {card.title}
-                            </p>
-                            <h2 className="text-2xl lg:text-3xl font-bold text-gray-800 mt-1">
-                                {card.value}
-                            </h2>
+        <div style={{ fontFamily: "'Inter', sans-serif", background: "#FBF7F1", minHeight: "100vh", color: "#2B1B14", padding: "32px 40px" }}>
+                    {loading ? (
+                        <LoadingState />
+                    ) : error ? (
+                        <div style={{ background: "#FBEAE7", border: "1px solid #F0CAC4", color: "#A14435", padding: "16px 20px", borderRadius: 14 }}>
+                            {error}
                         </div>
-                        <div
-                            className={`${card.color} w-12 h-12 rounded-2xl flex items-center justify-center text-xl text-white shadow-md`}
-                        >
-                            {card.icon}
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mt-8">
-                {/* Left Side (Orders & Tables) */}
-                <div className="xl:col-span-2 space-y-8">
-                    {/* Recent Orders */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-bold text-gray-800">
-                                Recent Orders
-                            </h2>
-                            <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-3 py-1 rounded-full">
-                                {dashboard?.recent_orders?.length || 0} Orders
-                            </span>
-                        </div>
-
-                        {!dashboard?.recent_orders || dashboard.recent_orders.length === 0 ? (
-                            <div className="text-center py-12 text-gray-400">
-                                No active orders found.
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                                            <th className="pb-3 px-3">Order</th>
-                                            <th className="pb-3 px-3">Table</th>
-                                            <th className="pb-3 px-3">Items</th>
-                                            <th className="pb-3 px-3">Status</th>
-                                            <th className="pb-3 px-3 text-right">Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50 text-sm">
-                                        {dashboard.recent_orders.map((order) => {
-                                            const total = getOrderTotal(order);
-
-                                            return (
-                                                <tr key={order.id} className="hover:bg-gray-50/50 transition">
-                                                    <td className="py-4 px-3 font-semibold text-gray-800">
-                                                        #{order.id}
-                                                    </td>
-                                                    <td className="py-4 px-3 text-gray-600">
-                                                        {order.table?.name || "N/A"}
-                                                    </td>
-                                                    <td className="py-4 px-3 text-gray-600">
-                                                        {order.items.length} items
-                                                    </td>
-                                                    <td className="py-4 px-3">
-                                                        <span
-                                                            className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${statusStyles(order.status)}`}
-                                                        >
-                                                            {order.status}
-                                                        </span>
-                                                    </td>
-                                                    <td className="py-4 px-3 text-right font-bold text-gray-800">
-                                                        Rs{total.toFixed(2)}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Restaurant Tables */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-bold text-gray-800">
-                                Restaurant Tables Status
-                            </h2>
-                            <span className="text-xs text-gray-400 font-medium">
-                                Tap a table to view its order &amp; bill
-                            </span>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {dashboard?.tables?.map((table) => (
-                                <button
-                                    key={table.id}
-                                    onClick={() => setSelectedTable(table)}
-                                    className={`text-left rounded-2xl p-5 text-white shadow-sm flex flex-col justify-between transition-transform hover:scale-[1.02] hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 cursor-pointer ${
-                                        table.status === "available"
-                                            ? "bg-emerald-500"
-                                            : table.status === "occupied"
-                                            ? "bg-rose-500"
-                                            : "bg-amber-500"
-                                    }`}
-                                >
-                                    <div>
-                                        <div className="flex justify-between items-center">
-                                            <h3 className="text-lg font-bold">{table.name}</h3>
-                                            <span className="text-xs bg-black/10 px-2 py-0.5 rounded-md font-medium">
-                                                {table.seats} seats
-                                            </span>
+                    ) : (
+                        <>
+                            {/* Header */}
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16, marginBottom: 28 }}>
+                                <div>
+                                    <h1 style={{ fontFamily: "'Fraunces', serif", fontSize: 32, fontWeight: 600, margin: 0, letterSpacing: "-0.01em" }}>
+                                        Good day, here's the floor
+                                    </h1>
+                                    <p style={{ color: "#8A7A6D", marginTop: 6, fontSize: 14 }}>
+                                        {stats.occupied_tables || 0} tables occupied · {stats.pending_orders || 0} orders waiting on the pass
+                                        {usingMock && <span style={{ color: "#C4703C" }}> · showing sample data</span>}
+                                    </p>
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                                    <div style={{ textAlign: "right" }}>
+                                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 16, fontWeight: 700 }}>
+                                            {currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                         </div>
-                                        <p className="capitalize text-xs text-white/80 mt-1">
-                                            {table.status}
-                                        </p>
+                                        <div style={{ fontSize: 11, color: "#9C897A" }}>
+                                            {currentTime.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+                                        </div>
                                     </div>
-
-                                    {table.orders && table.orders.length > 0 && (
-                                        <div className="mt-4 border-t border-white/20 pt-3 text-xs space-y-1">
-                                            <p>Order: <strong className="font-semibold">#{table.orders[0].id}</strong></p>
-                                            <p>Status: <strong className="capitalize font-semibold">{table.orders[0].status}</strong></p>
-                                            <p>Bill: <strong className="font-semibold">Rs{getTableBillTotal(table).toFixed(2)}</strong></p>
-                                        </div>
-                                    )}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Right Side Column */}
-                <div className="space-y-8">
-                    {/* Best Selling Items */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                        <h2 className="text-lg font-bold text-gray-800 mb-5">
-                            Best Selling Items
-                        </h2>
-
-                        {!dashboard?.best_selling || dashboard.best_selling.length === 0 ? (
-                            <p className="text-gray-400 text-sm">No sales data recorded yet.</p>
-                        ) : (
-                            <div className="space-y-4">
-                                {dashboard.best_selling.map((item) => (
-                                    <div
-                                        key={item.menu_item_id}
-                                        className="flex justify-between items-center border-b border-gray-50 pb-3 last:border-0 last:pb-0"
+                                    <button
+                                        onClick={() => (window.location.href = "/orders/new")}
+                                        style={pillButtonStyle("#C4703C", "#FFFFFF")}
                                     >
-                                        <div>
-                                            <h3 className="font-semibold text-sm text-gray-800">
-                                                {item.menu_item?.name}
-                                            </h3>
-                                            <p className="text-xs text-gray-400">
-                                                {item.menu_item?.category}
-                                            </p>
+                                        + New Order
+                                    </button>
+                                    <button onClick={fetchDashboard} style={pillButtonStyle("#FFFFFF", "#2B1B14", "#E7DCD0")}>
+                                        ⟳ Refresh
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Stat cards — receipt-notch signature */}
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 18, marginBottom: 28 }}>
+                                {cards.map((card) => (
+                                    <div key={card.title} style={receiptCardStyle}>
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                                            <div>
+                                                <p style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9C897A", margin: 0, fontWeight: 600 }}>
+                                                    {card.title}
+                                                </p>
+                                                <h2 style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 26, fontWeight: 700, margin: "10px 0 0", color: "#2B1B14" }}>
+                                                    {card.value}
+                                                </h2>
+                                            </div>
+                                            <div style={{ width: 40, height: 40, borderRadius: 12, background: "#F7ECDF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                                <card.icon color="#C4703C" />
+                                            </div>
                                         </div>
-                                        <span className="bg-amber-50 text-amber-700 border border-amber-200 text-xs px-2.5 py-1 rounded-full font-bold">
-                                            {item.sold} Sold
-                                        </span>
+                                        <div style={perfEdgeStyle} />
                                     </div>
                                 ))}
                             </div>
-                        )}
-                    </div>
 
-                    {/* Quick Actions */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                        <h2 className="text-lg font-bold text-gray-800 mb-5">
-                            Quick Actions
-                        </h2>
+                            {/* Main grid */}
+                            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(260px, 1fr)", gap: 24 }} className="cf-main-grid">
+                                {/* Left column */}
+                                <div style={{ display: "flex", flexDirection: "column", gap: 24, minWidth: 0 }}>
+                                    {/* Recent orders */}
+                                    <div style={panelStyle}>
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+                                            <h2 style={panelTitleStyle}>Recent Orders</h2>
+                                            <span style={countPillStyle}>{dashboard?.recent_orders?.length || 0} orders</span>
+                                        </div>
 
-                        <div className="grid grid-cols-1 gap-3">
-                            <button
-                                onClick={() => window.location.href = "/orders"}
-                                className="w-full bg-amber-600 hover:bg-amber-700 text-white py-3 rounded-xl font-semibold text-sm transition shadow-sm"
-                            >
-                                🧾 View Orders
-                            </button>
-                            <button
-                                onClick={() => window.location.href = "/tables"}
-                                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold text-sm transition shadow-sm"
-                            >
-                                🍽️ Manage Tables
-                            </button>
-                            <button
-                                onClick={() => window.location.href = "/menu"}
-                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-semibold text-sm transition shadow-sm"
-                            >
-                                🍔 Manage Menu
-                            </button>
-                            <button
-                                onClick={fetchDashboard}
-                                className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl font-semibold text-sm transition shadow-sm"
-                            >
-                                🔄 Refresh Dashboard
-                            </button>
-                        </div>
-                    </div>
+                                        {!dashboard?.recent_orders?.length ? (
+                                            <EmptyState text="No active orders yet." />
+                                        ) : (
+                                            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                                {dashboard.recent_orders.map((order) => {
+                                                    const total = getOrderTotal(order);
+                                                    const sty = statusStyles(order.status);
+                                                    return (
+                                                        <div
+                                                            key={order.id}
+                                                            style={{
+                                                                display: "flex", alignItems: "center", justifyContent: "space-between",
+                                                                padding: "13px 4px", borderBottom: "1px solid #F1E9DF",
+                                                            }}
+                                                        >
+                                                            <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                                                                <div style={{ width: 8, height: 8, borderRadius: "50%", background: sty.dot, flexShrink: 0 }} />
+                                                                <div style={{ minWidth: 0 }}>
+                                                                    <div style={{ fontWeight: 600, fontSize: 14 }}>
+                                                                        #{order.id} <span style={{ color: "#9C897A", fontWeight: 400 }}>· {order.table?.name || "N/A"}</span>
+                                                                    </div>
+                                                                    <div style={{ fontSize: 12, color: "#9C897A" }}>{order.items.length} items</div>
+                                                                </div>
+                                                            </div>
+                                                            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                                                                <span style={{ ...statusPillStyle, background: sty.bg, color: sty.fg }}>{order.status}</span>
+                                                                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 14, width: 78, textAlign: "right" }}>
+                                                                    Rs {total.toFixed(0)}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
 
-                    {/* Restaurant Summary */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                        <h2 className="text-lg font-bold text-gray-800 mb-5">
-                            Restaurant Summary
-                        </h2>
+                                    {/* Tables */}
+                                    <div style={panelStyle}>
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+                                            <h2 style={panelTitleStyle}>Floor Status</h2>
+                                            <span style={{ fontSize: 12, color: "#9C897A" }}>Tap a table for its bill</span>
+                                        </div>
+                                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
+                                            {dashboard?.tables?.map((table) => {
+                                                const c = tableColors(table.status);
+                                                return (
+                                                    <button
+                                                        key={table.id}
+                                                        onClick={() => setSelectedTable(table)}
+                                                        style={{
+                                                            textAlign: "left", borderRadius: 14, padding: 14, cursor: "pointer",
+                                                            background: c.bg, border: `1px solid ${c.border}`, color: c.fg,
+                                                            display: "flex", flexDirection: "column", gap: 6, transition: "transform 0.12s",
+                                                        }}
+                                                        onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-2px)")}
+                                                        onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}
+                                                    >
+                                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                            <span style={{ fontWeight: 700, fontSize: 14 }}>{table.name}</span>
+                                                            <span style={{ width: 7, height: 7, borderRadius: "50%", background: c.dot }} />
+                                                        </div>
+                                                        <span style={{ fontSize: 11, textTransform: "capitalize", opacity: 0.85 }}>
+                                                            {table.status} · {table.seats} seats
+                                                        </span>
+                                                        {table.orders?.length > 0 && (
+                                                            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 700, marginTop: 2 }}>
+                                                                Rs {getTableBillTotal(table).toFixed(0)}
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
 
-                        <div className="space-y-3 text-sm text-gray-600">
-                            <div className="flex justify-between">
-                                <span>Total Tables</span>
-                                <span className="font-bold text-gray-800">{stats.total_tables || 0}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>Occupied</span>
-                                <span className="font-bold text-rose-600">{stats.occupied_tables || 0}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>Available</span>
-                                <span className="font-bold text-emerald-600">{stats.available_tables || 0}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>Today's Revenue</span>
-                                <span className="font-bold text-emerald-600">Rs{Number(stats.today_revenue || 0).toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>Total Menu Items</span>
-                                <span className="font-bold text-gray-800">{stats.menu_items || 0}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>Pending Orders</span>
-                                <span className="font-bold text-amber-600">{stats.pending_orders || 0}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>Preparing Orders</span>
-                                <span className="font-bold text-orange-600">{stats.preparing_orders || 0}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span>Paid Orders</span>
-                                <span className="font-bold text-purple-600">{stats.paid_orders || 0}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                                {/* Right column */}
+                                <div style={{ display: "flex", flexDirection: "column", gap: 24, minWidth: 0 }}>
+                                    {/* Occupancy donut */}
+                                    <div style={panelStyle}>
+                                        <h2 style={{ ...panelTitleStyle, marginBottom: 18 }}>Table Occupancy</h2>
+                                        <Donut pct={occupancyPct} />
+                                        <div style={{ display: "flex", justifyContent: "center", gap: 18, marginTop: 14, fontSize: 12 }}>
+                                            <LegendDot color="#C1554A" label={`Occupied (${stats.occupied_tables || 0})`} />
+                                            <LegendDot color="#EADFCF" label={`Free (${stats.available_tables || 0})`} />
+                                        </div>
+                                    </div>
 
-            {/* Table Detail Modal */}
+                                    {/* Best sellers */}
+                                    <div style={panelStyle}>
+                                        <h2 style={{ ...panelTitleStyle, marginBottom: 16 }}>Best Sellers</h2>
+                                        {!dashboard?.best_selling?.length ? (
+                                            <EmptyState text="No sales recorded yet." />
+                                        ) : (
+                                            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                                                {dashboard.best_selling.map((item, i) => (
+                                                    <div key={item.menu_item_id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                                        <div
+                                                            style={{
+                                                                width: 26, height: 26, borderRadius: 8, flexShrink: 0,
+                                                                background: i === 0 ? "#C4703C" : "#F1E9DF",
+                                                                color: i === 0 ? "#fff" : "#8A7A6D",
+                                                                display: "flex", alignItems: "center", justifyContent: "center",
+                                                                fontSize: 12, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace",
+                                                            }}
+                                                        >
+                                                            {i + 1}
+                                                        </div>
+                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                            <div style={{ fontWeight: 600, fontSize: 13.5 }}>{item.menu_item?.name}</div>
+                                                            <div style={{ fontSize: 11.5, color: "#9C897A" }}>{item.menu_item?.category}</div>
+                                                        </div>
+                                                        <span style={{ ...statusPillStyle, background: "#F7ECDF", color: "#9A6A16", flexShrink: 0 }}>
+                                                            {item.sold} sold
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Summary */}
+                                    <div style={panelStyle}>
+                                        <h2 style={{ ...panelTitleStyle, marginBottom: 14 }}>Summary</h2>
+                                        <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 13 }}>
+                                            <SummaryRow label="Total tables" value={stats.total_tables || 0} />
+                                            <SummaryRow label="Menu items" value={stats.menu_items || 0} />
+                                            <SummaryRow label="Preparing" value={stats.preparing_orders || 0} />
+                                            <SummaryRow label="Paid orders" value={stats.paid_orders || 0} />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+            {/* Table detail modal */}
             {selectedTable && (
                 <div
-                    className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
                     onClick={() => setSelectedTable(null)}
+                    style={{ position: "fixed", inset: 0, background: "rgba(36,22,16,0.55)", backdropFilter: "blur(2px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}
                 >
                     <div
-                        className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto"
                         onClick={(e) => e.stopPropagation()}
+                        style={{ background: "#FFFFFF", borderRadius: 24, width: "100%", maxWidth: 560, maxHeight: "85vh", overflowY: "auto", fontFamily: "'Inter', sans-serif" }}
                     >
-                        {/* Modal header */}
-                        <div
-                            className={`p-6 rounded-t-3xl text-white flex justify-between items-start ${
-                                selectedTable.status === "available"
-                                    ? "bg-emerald-500"
-                                    : selectedTable.status === "occupied"
-                                    ? "bg-rose-500"
-                                    : "bg-amber-500"
-                            }`}
-                        >
+                        <div style={{ padding: 24, borderRadius: "24px 24px 0 0", background: "#241610", color: "#F3EAE1", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                             <div>
-                                <h2 className="text-2xl font-extrabold">{selectedTable.name}</h2>
-                                <p className="capitalize text-sm text-white/90 mt-1">
-                                    {selectedTable.status} • {selectedTable.seats} seats
+                                <h2 style={{ fontFamily: "'Fraunces', serif", fontSize: 24, margin: 0, fontWeight: 600 }}>{selectedTable.name}</h2>
+                                <p style={{ margin: "6px 0 0", fontSize: 13, color: "#D8C7BA", textTransform: "capitalize" }}>
+                                    {selectedTable.status} · {selectedTable.seats} seats
                                 </p>
                             </div>
                             <button
                                 onClick={() => setSelectedTable(null)}
-                                className="bg-white/20 hover:bg-white/30 rounded-full w-9 h-9 flex items-center justify-center text-lg font-bold transition"
-                                aria-label="Close"
+                                style={{ width: 32, height: 32, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.12)", color: "#F3EAE1", cursor: "pointer", fontSize: 15 }}
                             >
                                 ✕
                             </button>
                         </div>
 
-                        {/* Modal body */}
-                        <div className="p-6 space-y-6">
-                            {!selectedTable.orders || selectedTable.orders.length === 0 ? (
-                                <div className="text-center py-10">
-                                    <p className="text-gray-400 mb-4">This table has no active orders.</p>
+                        <div style={{ padding: 24 }}>
+                            {!selectedTable.orders?.length ? (
+                                <div style={{ textAlign: "center", padding: "30px 0" }}>
+                                    <p style={{ color: "#9C897A", marginBottom: 16 }}>This table has no active orders.</p>
                                     <button
-                                        onClick={() => window.location.href = `/orders/new?table=${selectedTable.id}`}
-                                        className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition shadow-sm"
+                                        onClick={() => (window.location.href = `/orders/new?table=${selectedTable.id}`)}
+                                        style={pillButtonStyle("#C4703C", "#FFFFFF")}
                                     >
-                                        ➕ Take New Order
+                                        + Take New Order
                                     </button>
                                 </div>
                             ) : (
                                 <>
                                     {selectedTable.orders.map((order) => (
-                                        <div key={order.id} className="border border-gray-100 rounded-2xl p-5">
-                                            <div className="flex justify-between items-center mb-4">
-                                                <h3 className="font-bold text-gray-800">
-                                                    Order #{order.id}
-                                                </h3>
-                                                <span
-                                                    className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${statusStyles(order.status)}`}
-                                                >
+                                        <div key={order.id} style={{ border: "1px solid #F1E9DF", borderRadius: 16, padding: 18, marginBottom: 16 }}>
+                                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+                                                <h3 style={{ margin: 0, fontWeight: 700, fontSize: 15 }}>Order #{order.id}</h3>
+                                                <span style={{ ...statusPillStyle, ...(() => { const s = statusStyles(order.status); return { background: s.bg, color: s.fg }; })() }}>
                                                     {order.status}
                                                 </span>
                                             </div>
-
-                                            <div className="divide-y divide-gray-50">
-                                                {(order.items || []).map((item, idx) => (
-                                                    <div
-                                                        key={idx}
-                                                        className="flex justify-between items-center py-2 text-sm"
-                                                    >
-                                                        <div>
-                                                            <p className="font-medium text-gray-700">
-                                                                {item.menu_item?.name || item.name}
-                                                            </p>
-                                                            <p className="text-xs text-gray-400">
-                                                                {item.quantity} x Rs{parseFloat(item.unit_price).toFixed(2)}
-                                                            </p>
-                                                        </div>
-                                                        <span className="font-semibold text-gray-800">
-                                                            Rs{(item.quantity * parseFloat(item.unit_price)).toFixed(2)}
-                                                        </span>
+                                            {(order.items || []).map((item, idx) => (
+                                                <div key={idx} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderTop: idx === 0 ? "none" : "1px solid #F7F1E9", fontSize: 13.5 }}>
+                                                    <div>
+                                                        <div style={{ fontWeight: 500 }}>{item.menu_item?.name || item.name}</div>
+                                                        <div style={{ fontSize: 12, color: "#9C897A" }}>{item.quantity} × Rs {parseFloat(item.unit_price).toFixed(2)}</div>
                                                     </div>
-                                                ))}
-                                            </div>
-
-                                            <div className="flex justify-between items-center mt-4 pt-3 border-t border-gray-100">
-                                                <span className="text-sm font-semibold text-gray-500">
-                                                    Order Total
-                                                </span>
-                                                <span className="text-lg font-bold text-gray-800">
-                                                    Rs{getOrderTotal(order).toFixed(2)}
-                                                </span>
+                                                    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>
+                                                        Rs {(item.quantity * parseFloat(item.unit_price)).toFixed(2)}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 12, paddingTop: 12, borderTop: "1px solid #F1E9DF", fontWeight: 700 }}>
+                                                <span style={{ color: "#9C897A", fontWeight: 600, fontSize: 13 }}>Order total</span>
+                                                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 16 }}>Rs {getOrderTotal(order).toFixed(2)}</span>
                                             </div>
                                         </div>
                                     ))}
 
-                                    {/* Combined bill across all orders on this table */}
-                                    <div className="bg-gray-50 rounded-2xl p-5 flex justify-between items-center">
-                                        <span className="font-bold text-gray-700">Table Bill</span>
-                                        <span className="text-2xl font-extrabold text-emerald-600">
-                                            Rs{getTableBillTotal(selectedTable).toFixed(2)}
+                                    <div style={{ background: "#FBF7F1", borderRadius: 16, padding: 18, display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                                        <span style={{ fontWeight: 700 }}>Table Bill</span>
+                                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 22, fontWeight: 700, color: "#C1554A" }}>
+                                            Rs {getTableBillTotal(selectedTable).toFixed(2)}
                                         </span>
                                     </div>
 
-                                    {/* Actions */}
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <button
-                                            onClick={() => window.location.href = `/orders/new?table=${selectedTable.id}`}
-                                            className="bg-amber-600 hover:bg-amber-700 text-white py-3 rounded-xl font-semibold text-sm transition shadow-sm"
-                                        >
-                                            ➕ Add Order
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                                        <button onClick={() => (window.location.href = `/orders/new?table=${selectedTable.id}`)} style={pillButtonStyle("#C4703C", "#FFFFFF")}>
+                                            + Add Order
                                         </button>
-                                        <button
-                                            onClick={() => window.location.href = `/orders/${selectedTable.orders[0].id}`}
-                                            className="bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold text-sm transition shadow-sm"
-                                        >
-                                            🧾 View / Manage Order
+                                        <button onClick={() => (window.location.href = `/orders/${selectedTable.orders[0].id}`)} style={pillButtonStyle("#FFFFFF", "#2B1B14", "#E7DCD0")}>
+                                            Manage Order
                                         </button>
                                     </div>
                                 </>
@@ -527,6 +426,129 @@ export default function Dashboard() {
                     </div>
                 </div>
             )}
+
+            <style>{`
+                @media (max-width: 880px) {
+                    .cf-main-grid { grid-template-columns: 1fr !important; }
+                }
+            `}</style>
         </div>
+    );
+}
+
+/* ------------------------------ styles ------------------------------ */
+const panelStyle = { background: "#FFFFFF", borderRadius: 20, padding: 22, border: "1px solid #F1E9DF" };
+const panelTitleStyle = { fontFamily: "'Fraunces', serif", fontSize: 17, fontWeight: 600, margin: 0 };
+const countPillStyle = { fontSize: 11.5, fontWeight: 600, background: "#F7ECDF", color: "#9A6A16", padding: "4px 10px", borderRadius: 999 };
+const statusPillStyle = { fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 999, textTransform: "capitalize" };
+const receiptCardStyle = { background: "#FFFFFF", borderRadius: 18, padding: "18px 20px 22px", border: "1px solid #F1E9DF", position: "relative", overflow: "hidden" };
+const perfEdgeStyle = {
+    position: "absolute", left: 0, right: 0, bottom: 0, height: 6,
+    backgroundImage: "radial-gradient(circle, #FBF7F1 3px, transparent 3.5px)",
+    backgroundSize: "12px 12px", backgroundPosition: "0 3px",
+};
+
+function pillButtonStyle(bg, fg, border) {
+    return {
+        background: bg, color: fg, border: border ? `1px solid ${border}` : "none",
+        padding: "10px 18px", borderRadius: 999, fontWeight: 600, fontSize: 13.5,
+        cursor: "pointer", whiteSpace: "nowrap",
+    };
+}
+
+/* ------------------------------ subcomponents ------------------------------ */
+function SummaryRow({ label, value }) {
+    return (
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ color: "#8A7A6D" }}>{label}</span>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>{value}</span>
+        </div>
+    );
+}
+
+function LegendDot({ color, label }) {
+    return (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#8A7A6D" }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
+            {label}
+        </div>
+    );
+}
+
+function EmptyState({ text }) {
+    return <div style={{ textAlign: "center", padding: "36px 0", color: "#B3A597", fontSize: 13.5 }}>{text}</div>;
+}
+
+function LoadingState() {
+    return (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "70vh", gap: 16 }}>
+            <div style={{ display: "flex", gap: 8 }}>
+                {[0, 1, 2].map((i) => (
+                    <div key={i} style={{ width: 12, height: 12, borderRadius: "50%", background: "#C4703C", animation: `cfBounce 1s ${i * 0.15}s infinite ease-in-out` }} />
+                ))}
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9C897A" }}>
+                Loading CafeFlow dashboard…
+            </div>
+            <style>{`@keyframes cfBounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-8px)} }`}</style>
+        </div>
+    );
+}
+
+function Donut({ pct }) {
+    const r = 54, c = 2 * Math.PI * r;
+    const offset = c - (pct / 100) * c;
+    return (
+        <div style={{ display: "flex", justifyContent: "center" }}>
+            <svg width="150" height="150" viewBox="0 0 150 150">
+                <circle cx="75" cy="75" r={r} fill="none" stroke="#EADFCF" strokeWidth="16" />
+                <circle
+                    cx="75" cy="75" r={r} fill="none" stroke="#C1554A" strokeWidth="16"
+                    strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
+                    transform="rotate(-90 75 75)" style={{ transition: "stroke-dashoffset 0.6s ease" }}
+                />
+                <text x="75" y="70" textAnchor="middle" fontFamily="'JetBrains Mono', monospace" fontSize="26" fontWeight="700" fill="#2B1B14">
+                    {pct}%
+                </text>
+                <text x="75" y="90" textAnchor="middle" fontFamily="'Inter', sans-serif" fontSize="11" fill="#9C897A">
+                    occupied
+                </text>
+            </svg>
+        </div>
+    );
+}
+
+/* ------------------------------ icons (inline, no deps) ------------------------------ */
+function TicketIcon({ color = "#C4703C" }) {
+    return (
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+            <path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a1.5 1.5 0 0 0 0 3v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2a1.5 1.5 0 0 0 0-3V8Z" stroke={color} strokeWidth="1.8" />
+            <path d="M9 6v12" stroke={color} strokeWidth="1.6" strokeDasharray="2 2" />
+        </svg>
+    );
+}
+function TableIcon({ color = "#C4703C" }) {
+    return (
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="6" width="18" height="4" rx="1.5" stroke={color} strokeWidth="1.8" />
+            <path d="M6 10v8M18 10v8" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+    );
+}
+function ClockIcon({ color = "#C4703C" }) {
+    return (
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.8" />
+            <path d="M12 7v5l3.5 2" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+    );
+}
+function CoinIcon({ color = "#C4703C" }) {
+    return (
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.8" />
+            <path d="M9.5 15c0 1.1 1.1 2 2.5 2s2.5-.7 2.5-1.6c0-2.3-5-1-5-3.3 0-.9 1.1-1.6 2.5-1.6s2.5.7 2.5 1.6" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+            <path d="M12 8v1M12 15v1" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
     );
 }
