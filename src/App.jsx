@@ -65,6 +65,7 @@ import Dashboard from './features/dashboard/pages/Dashboard';
 import Menu from './features/menu/pages/Menu';
 import Tables from './features/tables/pages/Tables';
 import Orders from './features/orders/pages/Orders';
+import Billing from './features/billing/pages/Billing';
 
 export default function App() {
     return (
@@ -113,7 +114,16 @@ export default function App() {
                             </ProtectedRoute>
                         }
                     />
-
+                    <Route 
+                        path="/billing"
+                        element={
+                            <ProtectedRoute>
+                                <Layout>
+                                    <Billing />
+                                </Layout>
+                            </ProtectedRoute>
+                        }
+                    />
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 </Routes>
             </AuthProvider>
