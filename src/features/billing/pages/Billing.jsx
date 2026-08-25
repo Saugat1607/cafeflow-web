@@ -16,7 +16,12 @@ import {
     RefreshCw,
 } from "lucide-react";
 
-import api from "../../../shared/api/client";
+import {
+    getBills,
+    createBill,
+    updateBill,
+    deleteBill,
+} from "../api/billsApi";
 
 const money = (value) =>
     `Rs. ${Number(value || 0).toLocaleString("en-NP", {
