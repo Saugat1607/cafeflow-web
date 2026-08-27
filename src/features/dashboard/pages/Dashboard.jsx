@@ -1,14 +1,15 @@
-import { useEffect, useState, useMemo } from "react";
-// import { getDashboardStats } from "../api/dashboardApi";
+import { useEffect, useState, useMemo, useRef } from "react";
+import { getDashboardStats } from "../api/dashboardApi";
 
 /* ------------------------------------------------------------------
-   MOCK DATA
-   This block only runs if getDashboardStats() is unavailable or fails
-   (e.g. previewing this file standalone). In your real project, keep
-   the import above uncommented and delete this block + the fallback
-   in fetchDashboard() — real data will flow through exactly the same
-   render code.
+   REALTIME CONFIG
+   Dashboard polls getDashboardStats() every POLL_INTERVAL_MS ms.
+   If the API call fails (e.g. while developing without a backend
+   running), it falls back to MOCK data below so the UI still renders
+   — remove the MOCK block once you don't need that safety net.
 ------------------------------------------------------------------- */
+const POLL_INTERVAL_MS = 10000; // 10s — tune to taste
+
 const MOCK = {
     stats: {
         today_revenue: 18420,
@@ -55,6 +56,8 @@ export default function Dashboard() {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [selectedTable, setSelectedTable] = useState(null);
     const [usingMock, setUsingMock] = useState(false);
+    const [lastUpdated, setLastUpdated] = useState(null);
+    const pollRef = useRef(null);
 
     useEffect(() => {
         if (!document.getElementById(FONT_LINK_ID)) {
@@ -66,28 +69,46 @@ export default function Dashboard() {
             document.head.appendChild(link);
         }
 
-        fetchDashboard();
-        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-        return () => clearInterval(timer);
+        // Initial load (shows the loading state)
+        fetchDashboard({ silent: false });
+
+        // Realtime polling — subsequent fetches happen quietly in the
+        // background without flipping the whole page into a loading state.
+        pollRef.current = setInterval(() => fetchDashboard({ silent: true }), POLL_INTERVAL_MS);
+
+        const clockTimer = setInterval(() => setCurrentTime(new Date()), 1000);
+
+        return () => {
+            clearInterval(pollRef.current);
+            clearInterval(clockTimer);
+        };
     }, []);
 
-    const fetchDashboard = async () => {
+    const fetchDashboard = async ({ silent = false } = {}) => {
         try {
-            setLoading(true);
-            // const response = await getDashboardStats();
-            // if (response.data.success) {
-            //     setDashboard(response.data.data);
-            //     setUsingMock(false);
-            // }
-            // Standalone-preview fallback:
-            await new Promise((r) => setTimeout(r, 500));
-            setDashboard(MOCK);
-            setUsingMock(true);
+            if (!silent) setLoading(true);
+            const response = await getDashboardStats();
+            if (response?.data?.success) {
+                setDashboard(response.data.data);
+                setUsingMock(false);
+                setError("");
+                setLastUpdated(new Date());
+            } else {
+                throw new Error("Unexpected response shape from getDashboardStats()");
+            }
         } catch (err) {
             console.error(err);
-            setError("Failed to load dashboard. Please try again later.");
+            if (!dashboard) {
+                // No data on screen yet (e.g. first load failed) — fall back
+                // to mock data so the layout still renders during dev.
+                setDashboard(MOCK);
+                setUsingMock(true);
+                setLastUpdated(new Date());
+            }
+            // Only surface a blocking error banner if we truly have nothing.
+            if (!dashboard && !MOCK) setError("Failed to load dashboard. Please try again later.");
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
@@ -148,6 +169,11 @@ export default function Dashboard() {
                                     <p style={{ color: "#8A7A6D", marginTop: 6, fontSize: 14 }}>
                                         {stats.occupied_tables || 0} tables occupied · {stats.pending_orders || 0} orders waiting on the pass
                                         {usingMock && <span style={{ color: "#C4703C" }}> · showing sample data</span>}
+                                        {!usingMock && lastUpdated && (
+                                            <span style={{ color: "#B3A597" }}>
+                                                {" "}· <LiveDot /> updated {lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                                            </span>
+                                        )}
                                     </p>
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -165,7 +191,7 @@ export default function Dashboard() {
                                     >
                                         + New Order
                                     </button>
-                                    <button onClick={fetchDashboard} style={pillButtonStyle("#FFFFFF", "#2B1B14", "#E7DCD0")}>
+                                    <button onClick={() => fetchDashboard({ silent: false })} style={pillButtonStyle("#FFFFFF", "#2B1B14", "#E7DCD0")}>
                                         ⟳ Refresh
                                     </button>
                                 </div>
@@ -431,6 +457,7 @@ export default function Dashboard() {
                 @media (max-width: 880px) {
                     .cf-main-grid { grid-template-columns: 1fr !important; }
                 }
+                @keyframes cfPulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
             `}</style>
         </div>
     );
@@ -472,6 +499,18 @@ function LegendDot({ color, label }) {
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
             {label}
         </div>
+    );
+}
+
+function LiveDot() {
+    return (
+        <span
+            style={{
+                display: "inline-block", width: 6, height: 6, borderRadius: "50%",
+                background: "#6B8F71", marginRight: 4, animation: "cfPulse 1.6s infinite ease-in-out",
+                verticalAlign: "middle",
+            }}
+        />
     );
 }
 
