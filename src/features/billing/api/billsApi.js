@@ -31,3 +31,8 @@ export const deleteBill = async (id) => {
 
     return response.data;
 };
+
+export const getRecentUnbilledOrders = async () => {
+    const response = await api.get('/bills/recent-orders');
+    return response.data;
+};
