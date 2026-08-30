@@ -124,6 +124,18 @@ export default function App() {
                             </ProtectedRoute>
                         }
                     />
+
+                    <Route
+                        path="/expenses"
+                        element={
+                            <ProtectedRoute>
+                                <Layout>
+                                    <Expenses />
+                                </Layout>
+                            </ProtectedRoute>
+                        }
+                    />
+
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 </Routes>
             </AuthProvider>
