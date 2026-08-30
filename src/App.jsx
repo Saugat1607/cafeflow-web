@@ -66,6 +66,7 @@ import Menu from './features/menu/pages/Menu';
 import Tables from './features/tables/pages/Tables';
 import Orders from './features/orders/pages/Orders';
 import Billing from './features/billing/pages/Billing';
+import Expenses from "./features/expenses/pages/Expenses";
 
 export default function App() {
     return (

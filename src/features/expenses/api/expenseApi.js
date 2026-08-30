@@ -1,5 +1,4 @@
-import api from "../../../api/client";
-
+import api from "../../../shared/api/client";
 //get expenses
 export const getExpenses = async(params = {}) => {
     const response = await api.get("/expenses", {
