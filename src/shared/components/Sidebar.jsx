@@ -17,9 +17,9 @@ const NAV_SECTIONS = [
         items: [
             { name: "Orders", path: "/orders", icon: "🧾" },
             { name: "Tables", path: "/tables", icon: "🍽️" },
-            { name: "Invoices", path: null, icon: "🧮" },
+            { name: "Invoices", path: "/invoices", icon: "🧮" },
             { name: "Daily Balance", path: null, icon: "💵" },
-            {name: "Bill", path:"/billing"}
+            {name: "Billing", path:"/billing", icon:"🧾" }
         ],
     },
     {
@@ -28,7 +28,7 @@ const NAV_SECTIONS = [
             { name: "Menu", path: "/menu", icon: "🍔" },
             { name: "Categories", path: null, icon: "🗂️" },
             { name: "Inventory", path: null, icon: "📦" },
-            { name: "Expenses", path: null, icon: "💸" },
+            { name: "Expenses", path: "/expenses", icon: "💸" },
         ],
     },
     {
