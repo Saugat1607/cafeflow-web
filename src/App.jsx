@@ -67,6 +67,7 @@ import Tables from './features/tables/pages/Tables';
 import Orders from './features/orders/pages/Orders';
 import Billing from './features/billing/pages/Billing';
 import Expenses from "./features/expenses/pages/Expenses";
+import Inventory from "./features/inventory/pages/Inventory";
 
 export default function App() {
     return (
@@ -115,7 +116,7 @@ export default function App() {
                             </ProtectedRoute>
                         }
                     />
-                    <Route 
+                    <Route
                         path="/billing"
                         element={
                             <ProtectedRoute>
@@ -132,6 +133,17 @@ export default function App() {
                             <ProtectedRoute>
                                 <Layout>
                                     <Expenses />
+                                </Layout>
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    <Route
+                        path="/inventory"
+                        element={
+                            <ProtectedRoute>
+                                <Layout>
+                                    <Inventory />
                                 </Layout>
                             </ProtectedRoute>
                         }
