@@ -27,7 +27,7 @@ const NAV_SECTIONS = [
         items: [
             { name: "Menu", path: "/menu", icon: "🍔" },
             { name: "Categories", path: null, icon: "🗂️" },
-            { name: "Inventory", path: null, icon: "📦" },
+            { name: "Inventory", path: "/inventory", icon: "📦" },
             { name: "Expenses", path: "/expenses", icon: "💸" },
         ],
     },
