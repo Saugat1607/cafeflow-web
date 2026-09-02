@@ -68,6 +68,7 @@ import Orders from './features/orders/pages/Orders';
 import Billing from './features/billing/pages/Billing';
 import Expenses from "./features/expenses/pages/Expenses";
 import Inventory from "./features/inventory/pages/Inventory";
+import Invoices from "./features/invoices/pages/Invoices";
 
 export default function App() {
     return (
@@ -144,6 +145,16 @@ export default function App() {
                             <ProtectedRoute>
                                 <Layout>
                                     <Inventory />
+                                </Layout>
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route 
+                        path="/invoices"
+                        element={
+                            <ProtectedRoute>
+                                <Layout>
+                                    <Invoices />
                                 </Layout>
                             </ProtectedRoute>
                         }
