@@ -40,7 +40,7 @@ const NAV_SECTIONS = [
     {
         label: "Insights",
         items: [
-            { name: "Reports", path: null, icon: "📈" },
+            { name: "Reports", path: "/reports", icon: "📈" },
         ],
     },
     {
