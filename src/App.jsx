@@ -69,6 +69,7 @@ import Billing from './features/billing/pages/Billing';
 import Expenses from "./features/expenses/pages/Expenses";
 import Inventory from "./features/inventory/pages/Inventory";
 import Invoices from "./features/invoices/pages/Invoices";
+import Staff from "./features/staff/pages/Staff";
 
 export default function App() {
     return (
@@ -155,6 +156,17 @@ export default function App() {
                             <ProtectedRoute>
                                 <Layout>
                                     <Invoices />
+                                </Layout>
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    <Route 
+                        path="/admin/staff"
+                        element={
+                            <ProtectedRoute>
+                                <Layout>
+                                    <Staff />
                                 </Layout>
                             </ProtectedRoute>
                         }

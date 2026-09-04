@@ -34,7 +34,7 @@ const NAV_SECTIONS = [
     {
         label: "Team",
         items: [
-            { name: "Staff", path: null, icon: "🧑‍🍳" },
+            { name: "Staff", path: "/admin/staff", icon: "🧑‍🍳" },
         ],
     },
     {
