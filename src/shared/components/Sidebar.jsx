@@ -18,7 +18,7 @@ const NAV_SECTIONS = [
             { name: "Orders", path: "/orders", icon: "🧾" },
             { name: "Tables", path: "/tables", icon: "🍽️" },
             { name: "Invoices", path: "/invoices", icon: "🧮" },
-            { name: "Daily Balance", path: null, icon: "💵" },
+            { name: "Daily Balance", path: "/daily-balance", icon: "💵" },
             {name: "Billing", path:"/billing", icon:"🧾" }
         ],
     },

@@ -71,6 +71,7 @@ import Inventory from "./features/inventory/pages/Inventory";
 import Invoices from "./features/invoices/pages/Invoices";
 import Staff from "./features/staff/pages/Staff";
 import Reports from "./features/reports/pages/Reports";
+import DailyBalance from "./features/daily-balance/pages/DailyBalance";
 
 export default function App() {
     return (
@@ -183,6 +184,21 @@ export default function App() {
                             </ProtectedRoute>
                         }
                     />
+
+                    <Route
+                        path="/daily-balance"
+                        element={
+                            <ProtectedRoute>
+                                <Layout>
+                                    <DailyBalance />
+                                </Layout>
+                            </ProtectedRoute>
+                        }
+                    />
+
+
+                
+
 
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 </Routes>
